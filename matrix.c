@@ -5,15 +5,15 @@
 #include <stdio.h>
 
 
-void scanfArray(int *array, int *n)
+void scanfArray(double *array, int *n)
 {
 	for (int i = 0; i < *n; i++)
 	{
-		scanf("%d", &array[i]);
+		scanf("%lf", &array[i]);
 	}
 }
 
-void scanfMatrix(int **matrix, int *n)
+void scanfMatrix(double **matrix, int *n)
 {
 	for (int i = 0; i < *n; i++)
 	{
@@ -21,16 +21,16 @@ void scanfMatrix(int **matrix, int *n)
 	}
 }
 
-void printArray(int *array, int *n)
+void printArray(double *array, int *n)
 {
 	for (int i = 0; i < *n; i++)
 	{
-		printf("%d ", array[i]);
+		printf("%f ", array[i]);
 	}
 	printf("\n");
 }
 
-void printMatrix(int **matrix, int *n)
+void printMatrix(double **matrix, int *n)
 {
 	for (int i = 0; i < *n; i++)
 	{
@@ -38,7 +38,7 @@ void printMatrix(int **matrix, int *n)
 	}
 }
 
-void initMatrix(int **matrix, int *n)
+void initMatrix(double **matrix, int *n)
 {
 	for (int i = 0; i < *n; i++)
 	{
@@ -54,9 +54,9 @@ void initMatrix(int **matrix, int *n)
 	}
 }
 
-int multVectors(int *row, int *column, int *n)
+double multVectors(double *row, double *column, int *n)
 {
-	int result = 0;
+	double result = 0;
 	for (int i = 0; i < *n; i++)
 	{
 		result += (row[i] * column[i]);
@@ -64,7 +64,7 @@ int multVectors(int *row, int *column, int *n)
 	return result;
 }
 
-int* multMatrixByVector(int **matrix, int *vector, int *result, int *n)
+double* multMatrixByVector(double **matrix, double *vector, double *result, int *n)
 {
 	for (int i = 0; i < *n; i++)
 	{

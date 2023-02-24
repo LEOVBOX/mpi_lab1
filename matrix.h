@@ -5,13 +5,13 @@
 #ifndef MPI_LAB1_MATRIX_H
 #define MPI_LAB1_MATRIX_H
 
-void scanfArray(int *array, int *n);
-void scanfMatrix(int **matrix, int *n);
-void printArray(int *array, int *n);
-void printMatrix(int **matrix, int *n);
-void initMatrix(int **matrix, int *n);
-int multVectors(int *row, int *column, int *n);
-int* multMatrixByVector(int **matrix, int *vector, int *result, int *n);
+void scanfArray(double *array, int *n);
+void scanfMatrix(double **matrix, int *n);
+void printArray(double *array, int *n);
+void printMatrix(double **matrix, int *n);
+void initMatrix(double **matrix, int *n);
+double multVectors(double *row, double *column, int *n);
+double* multMatrixByVector(double **matrix, double *vector, double *result, int *n);
 
 
 #endif //MPI_LAB1_MATRIX_H
