@@ -3,6 +3,7 @@
 //
 
 #include <stdio.h>
+#include "mm_malloc.h"
 
 
 void scanfArray(double *array, int *n)
@@ -21,7 +22,7 @@ void scanfMatrix(double **matrix, int *n)
 	}
 }
 
-void printArray(double *array, int *n)
+void printArray(double *array, int const *n)
 {
 	for (int i = 0; i < *n; i++)
 	{
@@ -38,23 +39,7 @@ void printMatrix(double **matrix, int *n)
 	}
 }
 
-void initMatrix(double **matrix, int *n)
-{
-	for (int i = 0; i < *n; i++)
-	{
-		for (int j = 0; j < *n; j++)
-		{
-			if (i == j)
-			{
-				matrix[i][j] = 2;
-			}
-			else
-				matrix[i][j] = 1;
-		}
-	}
-}
-
-double multVectors(double *row, double *column, int *n)
+double multVectors(double *row, double *column, int const *n)
 {
 	double result = 0;
 	for (int i = 0; i < *n; i++)
@@ -71,3 +56,15 @@ double* multMatrixByVector(double **matrix, double *vector, double *result, int 
 		result[i] = multVectors(matrix[i], vector, n);
 	}
 }
+
+double* vectorSub(double *vector1, double const *vector2, int const *n)
+{
+	double* result = vector1;
+	for (int i = 0; i < *n; i++)
+	{
+		result[i] = vector1[i] - vector2[i];
+	}
+	return result;
+}
+
+//double* paralleMultlMatrixByVector()
