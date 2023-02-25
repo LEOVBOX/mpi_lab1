@@ -7,9 +7,7 @@
 #define N_TAG 11
 #define MATRIX_TAG 10
 #define VECTOR_TAG 12
-#define COUNTER_TAG 14
 #define RESULT_TAG 13
-#define CANSEL_TAG 15
 
 int main(int argc, char* argv[])
 {
@@ -59,8 +57,8 @@ int main(int argc, char* argv[])
 			matrix[i] = (double*)malloc(sizeof(double) * n);
 		}
 		initMatrix(matrix, &n);
-		//printf("Matrix initialized\n");
-		printMatrix(matrix, &n);
+		printf("Matrix initialized\n");
+		//printMatrix(matrix, &n);
 
 		double* result = (double*)malloc(sizeof(double) * n);
 		int *countRecv = (int*)malloc(sizeof(int));
@@ -81,7 +79,7 @@ int main(int argc, char* argv[])
 				to_thread = 1;
 			//printf("to_thread = %d; size = %d; row = %d\n", to_thread, size, row);
 			MPI_Send(matrix[row], n, MPI_DOUBLE, to_thread, MATRIX_TAG, MPI_COMM_WORLD);
-			printf("row: %d sent to process %d\n ", row, to_thread);
+			printf("row %d sent to process %d\n ", row, to_thread);
 			to_thread++;
 			*countRecv += 1;
 		}
@@ -110,7 +108,6 @@ int main(int argc, char* argv[])
 	{
 		double resultNum = 0;
 		int n = 0;
-		int countQueue = 0;
 		MPI_Recv(&n, 1, MPI_INT, ROOT_THREAD, N_TAG, MPI_COMM_WORLD, &status);
 		//printf("Process %d: n = %d\n", rank, n);
 
@@ -132,7 +129,9 @@ int main(int argc, char* argv[])
 			MPI_Send(&resultNum, 1, MPI_DOUBLE, ROOT_THREAD, RESULT_TAG, MPI_COMM_WORLD);
 		}
 
-		if (rank <= n%size)
+		int isAdditionRow = (rank <= (n%(size-1)));
+		//printf("Process %d: isAdditionRow = %d, addition = %d, size = %d\n", rank, isAdditionRow, n%size, size);
+		if (isAdditionRow)
 		{
 			MPI_Recv(row, n, MPI_DOUBLE, ROOT_THREAD, MATRIX_TAG, MPI_COMM_WORLD, &status);
 			printf("Process %d: recv row: ", rank);
