@@ -4,16 +4,24 @@
 
 #ifndef MPI_LAB1_NONLINEAR_EQUATION_H
 #define MPI_LAB1_NONLINEAR_EQUATION_H
+
 #include <stdio.h>
 
 // Инициализирует матрицу с главной диагональю равной 2. Остальные значения равны 1.
-void initMatrix(double **matrix, int const *n);
+void initDefaultMatrix(double **matrix, int const *n);
 void initVectorX(double *vector, int const *n);
 void initVectorB(double *vector, int const *n);
 void sendRows(double **matrix, int const *n, int const *size);
 void recvResults(double *result, int const *n, int const *size, MPI_Status *status);
-void mpiMultMatrixByVectorRoot(double *resBuffer, double **matrix, double *vectorX, double *vectorB,
-		int const *n, int const *size, MPI_Status *status);
-void recvMultSend(int const *rank, double *row, double *vector, double const *b, int const *n, MPI_Status *status);
-void mpiMultVectorByVector(int const *rank, int const *size, double *vectorB, int const *n, MPI_Status *status);
+void calcIterationRoot(double* resBuffer, double** matrix, double* vectorX, double const* vectorB,
+		int const* n, int const* threadCount, MPI_Status* status);
+void calcIteration(int const* rank, int const* threadCount, double* vectorX, double* vectorB, int const* n, MPI_Status* status);
+void recvCalcSend(int const *ind, double *row, double *vectorX, double const *vectorB,
+		int const *n, MPI_Status *status);
+void splitVectorSend(double* vector, int const* n, int const* threadCount);
+int calcCriterion(double const* denominator, double const* vectorB, int const* n);
+double euclideanNorm(double const* vector, int const* n);
+void sendCrit(int const* crit, int const *threadCount);
+void sendForChildren(void* buf, int count, int threadCount, int tag);
+void sendVectors(double* vectorX, double* vectorB, int const* n, int const* threadCount);
 #endif //MPI_LAB1_NONLINEAR_EQUATION_H

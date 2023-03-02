@@ -31,7 +31,7 @@ void printArray(double *array, int const *n)
 	printf("\n");
 }
 
-void printMatrix(double **matrix, int *n)
+void printMatrix(double **matrix, int const *n)
 {
 	for (int i = 0; i < *n; i++)
 	{
@@ -66,5 +66,27 @@ double* vectorSub(double *vector1, double const *vector2, int const *n)
 	}
 	return result;
 }
+
+double* multVectorByNum(double *vector, double const *num, int const *n)
+{
+	double* result = vector;
+	for (int i = 0; i < *n; i++)
+	{
+		result[i] = vector[i] * *num;
+	}
+	return result;
+}
+
+double **mallocMatrix(int const *n)
+{
+	double** matrix = (double**)malloc(sizeof(double*) * (*n));
+	for (int i = 0; i < *n; i++)
+	{
+		matrix[i] = (double*)malloc(sizeof(double) * (*n));
+	}
+	return matrix;
+}
+
+
 
 //double* paralleMultlMatrixByVector()

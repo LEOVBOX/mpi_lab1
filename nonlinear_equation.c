@@ -5,16 +5,10 @@
 #include <stdio.h>
 #include "matrix.h"
 #include "mm_malloc.h"
+#include "math.h"
+#include "constants.h"
 
-#define ROOT_THREAD 0
-#define N_TAG 11
-#define MATRIX_TAG 10
-#define VECTORX_TAG 12
-#define VECTORB_TAG 14
-#define RESULT_TAG 13
-
-
-void initMatrix(double **matrix, int const *n)
+void initDefaultMatrix(double** matrix, int const* n)
 {
 	for (int i = 0; i < *n; i++)
 	{
@@ -30,25 +24,41 @@ void initMatrix(double **matrix, int const *n)
 	}
 }
 
-void initVectorB(double *vector, int const *n)
+void initVectorB(double* vector, int const* n)
 {
 	for (int i = 0; i < *n; i++)
 	{
-		vector[i] = *n+1;
+		vector[i] = *n + 1;
 	}
 }
 
-void initVectorX(double *vector, int const *n)
+void initVectorX(double* vector, int const* n)
 {
 	for (int i = 0; i < *n; i++)
 	{
-		vector[i] = 0;
+		vector[i] = 0.0;
 	}
 }
 
-void sendVectors(double const *vectorB, double const *vectorX, int const *n, int const *size)
+void sendCrit(int const* crit, int const *threadCount)
 {
-	for (int to_thread = 1; to_thread < *size; to_thread++)
+	for (int toThread = 1; toThread < *threadCount; toThread++)
+	{
+		MPI_Send(crit, 1, MPI_INT, toThread, CRITERION_TAG, MPI_COMM_WORLD);
+	}
+}
+
+void sendForChildren(void* buf, int count, int threadCount, int tag)
+{
+	for (int to_thread = 1; to_thread < threadCount; to_thread++)
+	{
+		MPI_Send(buf, count, MPI_DOUBLE, to_thread, tag, MPI_COMM_WORLD);
+	}
+}
+
+void sendVectors(double* vectorX, double* vectorB, int const* n, int const* threadCount)
+{
+	for (int to_thread = 1; to_thread < *threadCount; to_thread++)
 	{
 		MPI_Send(n, 1, MPI_INT, to_thread, N_TAG, MPI_COMM_WORLD);
 		MPI_Send(vectorX, *n, MPI_DOUBLE, to_thread, VECTORX_TAG, MPI_COMM_WORLD);
@@ -56,75 +66,113 @@ void sendVectors(double const *vectorB, double const *vectorX, int const *n, int
 	}
 }
 
-void sendRows(double **matrix, int const *n, int const *size)
-{
 
-	int to_thread = 1;
+void sendRows(double** matrix, int const* n, int const* threadCount)
+{
+	int toThread = 1;
 	for (int row = 0; row < *n; row += 1)
 	{
-		if (to_thread == *size)
-			to_thread = 1;
-		//printf("to_thread = %d; size = %d; row = %d\n", to_thread, size, row);
-		MPI_Send(matrix[row], *n, MPI_DOUBLE, to_thread, MATRIX_TAG, MPI_COMM_WORLD);
-		//printf("row %d sent to process %d\n ", row, to_thread);
-		to_thread++;
+		if (toThread == *threadCount)
+			toThread = 1;
+		//printf("to_thread = %d; threadCount = %d; row = %d\n", to_thread, threadCount, row);
+		MPI_Send(matrix[row], *n, MPI_DOUBLE, toThread, MATRIX_TAG, MPI_COMM_WORLD);
+		//printf("row %d sent to process %d\n ", row, toThread);
+		toThread++;
 	}
 
 }
 
-void recvResults(double *resBuffer, int const *n, int const *size, MPI_Status *status)
+void recvResults(double* resBuffer, int const* n, int const* threadCount, MPI_Status* status)
 {
-	for (int i = 0; i < *n; i++)
+
+	int fromThread = 1;
+	for (int row = 0; row < *n; row++)
 	{
-		MPI_Recv(&resBuffer[i], *size, MPI_DOUBLE, MPI_ANY_SOURCE, RESULT_TAG, MPI_COMM_WORLD, status);
-		//printf("result %d row recv\n", i);
+		if (fromThread == *threadCount)
+			fromThread = 1;
+		MPI_Recv(&resBuffer[row], *threadCount, MPI_DOUBLE, fromThread, RESULT_TAG, MPI_COMM_WORLD, status);
+		//printf("result %d recv\n", row);
+		fromThread++;
 	}
 }
 
-void mpiMultMatrixByVectorRoot(double *resBuffer, double **matrix, double *vectorX, double *vectorB,
-		int const *n, int const *size, MPI_Status *status)
+
+
+void calcIterationRoot(double* resBuffer, double** matrix, double* vectorX, double const* vectorB,
+		int const* n, int const* threadCount, MPI_Status* status)
 {
-	sendVectors(vectorB, vectorX, n, size);
-	sendRows(matrix, n, size);
-	recvResults(resBuffer, n, size, status);
+	sendForChildren(vectorX, *n, *threadCount, VECTORX_TAG);
+	//printf("Root: vectors sent\n");
+
+	sendRows(matrix, n, threadCount);
+	//printf("Root: vectors sent\n");
+
+	recvResults(resBuffer, n, threadCount, status);
+	//printf("Root: results received\n");
+
 }
 
-void recvMultSend(int const *rank, double *row, double *vector, double *b, int const *n, MPI_Status *status)
+void recvCalcSend(int const* ind, double* row, double* vectorX, double const* vectorB, int const* n,
+		MPI_Status* status)
 {
 	MPI_Recv(row, *n, MPI_DOUBLE, ROOT_THREAD, MATRIX_TAG, MPI_COMM_WORLD, status);
-	//printf("Process %d: recv row: ", *rank);
-	//printArray(row, n);
 
-	double resultNum = multVectors(vector, row, n);
-	resultNum -= *b;
-	//printf("Process %d: multed, result = %f\n", *rank, resultNum);
+	// A*x
+	double resultNum = multVectors(vectorX, row, n);
+	// (Ax-b)
+	resultNum = resultNum - vectorB[*ind];
 
 	MPI_Send(&resultNum, 1, MPI_DOUBLE, ROOT_THREAD, RESULT_TAG, MPI_COMM_WORLD);
 }
 
-void mpiMultVectorByVector(int const *rank, int const *size, double *vectorB, int const *n, MPI_Status *status)
+double euclideanNorm(double const* vector, int const* n)
+{
+	double result = 0;
+	for (int i = 0; i < *n; i++)
+	{
+		result += vector[i] * vector[i];
+	}
+	result = sqrt(result);
+	return result;
+}
+
+int calcCriterion(double const* denominator, double const* vectorB, int const* n)
+{
+	double vectorBNorm = euclideanNorm(vectorB, n);
+	double denominatorNorm = euclideanNorm(denominator, n);
+	double crit = (denominatorNorm / vectorBNorm);
+	printf("Root: crit = %f , epsilon = %f\n", crit, EPSILON);
+	//getchar();
+	if (crit < EPSILON)
+		return 1;
+	return 0;
+}
+
+
+void calcIteration(int const* rank, int const* threadCount, double* vectorX, double* vectorB, int const* n, MPI_Status* status)
 {
 
-	double *vectorX = (double*)malloc(sizeof(double) * *n);
 	MPI_Recv(vectorX, *n, MPI_DOUBLE, ROOT_THREAD, VECTORX_TAG, MPI_COMM_WORLD, status);
 
-	double *row = (double*)malloc(sizeof(double) * *n);
+	double* row = (double*)malloc(sizeof(double) * *n);
 
-	for (int i = 0; i < *n/((*size)-1); i++)
+	for (int i = 0; i < *n / ((*threadCount) - 1); i++)
 	{
-		recvMultSend(rank, row, vectorX, &vectorB[*rank], n, status);
+		recvCalcSend(rank - 1, row, vectorX, vectorB, n, status);
 		//printf("Process %d: %d iteration done\n", *rank, i);
 	}
 
-	int isAdditionRow = (*rank <= (*n % ((*size) - 1)));
-	//printf("Process %d: isAdditionRow = %d, addition = %d, size = %d\n", *rank, isAdditionRow, *n%((*size) - 1), *size);
+	int isAdditionRow = (*rank <= (*n % ((*threadCount) - 1)));
+	//printf("Process %d: isAdditionRow = %d, addition = %d, threadCount = %d\n", *rank, isAdditionRow, *n%((*threadCount) - 1), *threadCount);
 	if (isAdditionRow)
 	{
-		recvMultSend(rank, row, vectorX, &vectorB[*rank], n, status);
+		int ind = (((*threadCount) - 1) * ((*n) / ((*threadCount) - 1)) + (*rank)) - 1;
+		//printf("Process %d: add ind = %d\n", *rank, ind);
+		recvCalcSend(&ind, row, vectorX, vectorB, n, status);
 		//printf("Process %d: addition iteration done\n", *rank);
 	}
-
-	//printf("Process %d: done\n", *rank);
+	free(row);
+	//printf("Process %d: done calculation iteration\n", *rank);
 }
 
 
