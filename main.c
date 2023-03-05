@@ -25,35 +25,20 @@ int main(int argc, char* argv[])
 	// Получение номера процесса
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	int crit = 0;
-	// Корневой процесс
+	int n = N_NUM;
 
+	// Инициализация вектора
+	double* vectorB = (double*)malloc(sizeof(double) * n);
+	initVectorB(vectorB, &n);
+	//printf("VectorB initialised \n");
+
+	double* vectorX = (double*)malloc(sizeof(double) * n);
+	initVectorX(vectorX, &n);
+
+	// Корневой процесс
 	if (rank == ROOT_THREAD)
 	{
 		double startTime = MPI_Wtime();
-		//printf("Введите n - размер матрицы\n");
-		// Размер матрицы
-		int n = N_NUM;
-
-		//printf("Should be %d iterations\n", n/size);
-
-		/*if (scanf("%d", &n) == EOF)
-		{
-			printf("scanf error\n");
-		}*/
-
-		// Инициализация вектора
-		double* vectorB = (double*)malloc(sizeof(double) * n);
-		initVectorB(vectorB, &n);
-		printf("VectorB initialised: \n");
-		//printArray(vectorB , &n);
-		double* vectorX = (double*)malloc(sizeof(double) * n);
-		initVectorX(vectorX, &n);
-		printf("VectorX initialised: \n");
-		//printArray(vectorX, &n);
-
-		//printf("Вектор на который умножать\n");
-		//printArray(vector, &n);
-		//printf("\n");
 
 		// Инициализация матрицы
 		double** matrix = mallocMatrix(&n);
@@ -64,24 +49,22 @@ int main(int argc, char* argv[])
 		// Вектор для хранения результата (Ax - b)
 		double* result = (double*)malloc(sizeof(double) * n);
 
-		sendVectors(vectorX, vectorB, &n, &threadCount);
+		sendRows(matrix, &n, &threadCount);
 
 		while (crit == 0)
 		{
-			calcIterationRoot(result, matrix, vectorX, vectorB, &n, &threadCount, &status);
+			calcIterationRoot(result, vectorX, &n, &threadCount, &status);
 			crit = calcCriterion(result, vectorB, &n);
 			sendCrit(&crit, &threadCount);
+
 			for (int i = 0; i < n; ++i)
 			{
 				result[i] *= TAU;
 				vectorX[i] -= result[i];
 			}
-			//printf("Root: crit was calculated = %d\n", crit);
 		}
 		printf("Root: calculation done\n");
-			//printArray(result, &n);
 
-			//printArray(result, &n);
 			free(result);
 			free(vectorX);
 			free(vectorB);
@@ -94,36 +77,48 @@ int main(int argc, char* argv[])
 			double endTime = MPI_Wtime();
 
 			printf("TIME: %lf\n", endTime - startTime);
+
 	}
 
 	// Не корневой процесс
 	else
 	{
-		int n = 0;
-		MPI_Recv(&n, 1, MPI_INT, ROOT_THREAD, N_TAG, MPI_COMM_WORLD, &status);
-		printf("Process %d: n received\n", rank);
 
-		double* vectorB = (double*)malloc(sizeof(double) * n);
-		MPI_Recv(vectorB, n, MPI_DOUBLE, ROOT_THREAD, VECTORB_TAG, MPI_COMM_WORLD, &status);
-		printf("Process %d: vectorB received\n", rank);
-		double* vectorX = (double*)malloc(sizeof(double) * n);
+		// Инициализация подматрицы
+		int subMatrixSize = n / ((threadCount) - 1);
+		int isAdditionRow = (rank <= (n % ((threadCount) - 1)));
+		//printf("Process %d: isAdditionRow = %d\n", rank, isAdditionRow);
+		if (isAdditionRow == 1)
+		{
+			subMatrixSize += 1;
+		}
+
+		double** subMatrix = (double**)malloc(sizeof(double*) * subMatrixSize);
+		for (int i = 0; i < subMatrixSize; i++)
+		{
+			subMatrix[i] = (double*)malloc(sizeof(double) * n);
+		}
+
+		// Получение строк матрицы
+		recvRows(subMatrix, &subMatrixSize, &n, &isAdditionRow, &status);
+
 
 		while (crit == 0)
 		{
 			// Подсчет (Ax - b)
-			calcIteration(&rank, &threadCount, vectorX, vectorB, &n, &status);
+			calcIteration(&rank, subMatrix, &subMatrixSize, vectorX, vectorB, &n, &status);
 			MPI_Recv(&crit, 1, MPI_INT, ROOT_THREAD, CRITERION_TAG, MPI_COMM_WORLD, &status);
-			printf("Process %d: recieved calcCriterion = %d\n", rank, crit);
+			//printf("Process %d: recieved calcCriterion = %d\n", rank, crit);
 		}
 		printf("Process %d: Calculation done\n", rank);
 
 		free(vectorX);
 		free(vectorB);
-		printf("Process %d: vectorB was free\n", rank);
+		//printf("Process %d: vectorB was free\n", rank);
 	}
-	//MPI_Barrier(MPI_COMM_WORLD);
-	if (MPI_Probe(ROOT_THREAD, MPI_ANY_TAG, MPI_COMM_WORLD, &status) == MPI_SUCCESS)
-		printf("Process %d: waiting for \n", rank);
+
+	//if (MPI_Probe(ROOT_THREAD, MPI_ANY_TAG, MPI_COMM_WORLD, &status) == MPI_SUCCESS)
+		//printf("Process %d: waiting for recv\n", rank);
 
 
 
