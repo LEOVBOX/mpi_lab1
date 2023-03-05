@@ -10,7 +10,7 @@
 #define VECTORX_TAG 12
 #define RESULT_TAG 13
 #define EPSILON 0.00001
-#define N_NUM 10000
+#define N_NUM 1000
 #define CRITERION_TAG 17
 #define TAU 0.0001
 

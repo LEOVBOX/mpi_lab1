@@ -22,6 +22,8 @@ int main(int argc, char* argv[])
 
 	// Получение числа инициализированных процессов.
 	MPI_Comm_size(MPI_COMM_WORLD, &threadCount);
+	//printf("threadCount = %d\n", threadCount);
+
 	// Получение номера процесса
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	int crit = 0;
@@ -34,6 +36,7 @@ int main(int argc, char* argv[])
 
 	double* vectorX = (double*)malloc(sizeof(double) * n);
 	initVectorX(vectorX, &n);
+	//printf("VectorX init\n");
 
 	// Корневой процесс
 	if (rank == ROOT_THREAD)
@@ -43,19 +46,29 @@ int main(int argc, char* argv[])
 		// Инициализация матрицы
 		double** matrix = mallocMatrix(&n);
 		initDefaultMatrix(matrix, &n);
-		printf("Matrix initialized\n");
+		//printf("Matrix initialized\n");
 		//printMatrix(matrix, &n);
 
 		// Вектор для хранения результата (Ax - b)
 		double* result = (double*)malloc(sizeof(double) * n);
 
-		sendRows(matrix, &n, &threadCount);
+		if (threadCount > 1)
+		{
+			sendRows(matrix, &n, &threadCount);
+		}
+
+		printf("sendRows passed\n");
 
 		while (crit == 0)
 		{
-			calcIterationRoot(result, vectorX, &n, &threadCount, &status);
+			calcIterationRoot(result, matrix, vectorX, vectorB, &n, &threadCount, &status);
+			//printf("calcIterationRoot passed\n");
 			crit = calcCriterion(result, vectorB, &n);
-			sendCrit(&crit, &threadCount);
+			if (threadCount > 1)
+			{
+				sendCrit(&crit, &threadCount);
+			}
+
 
 			for (int i = 0; i < n; ++i)
 			{
@@ -65,33 +78,31 @@ int main(int argc, char* argv[])
 		}
 		printf("Root: calculation done\n");
 
-			free(result);
-			free(vectorX);
-			free(vectorB);
-			for (int i = 0; i < n; i++)
-				free(matrix[i]);
-			free(matrix);
+		free(result);
+		for (int i = 0; i < n; i++)
+			free(matrix[i]);
+		free(matrix);
 
-			printf("Matrix was deleted\n");
+		printf("Matrix was deleted\n");
 
-			double endTime = MPI_Wtime();
+		double endTime = MPI_Wtime();
 
-			printf("TIME: %lf\n", endTime - startTime);
-
+		printf("TIME: %lf\n", endTime - startTime);
 	}
 
 	// Не корневой процесс
 	else
 	{
 
-		// Инициализация подматрицы
-		int subMatrixSize = n / ((threadCount) - 1);
-		int isAdditionRow = (rank <= (n % ((threadCount) - 1)));
-		//printf("Process %d: isAdditionRow = %d\n", rank, isAdditionRow);
-		if (isAdditionRow == 1)
+		// Инициализация подматрицы.
+		int subMatrixSize = n / threadCount;
+
+		if (isAddtionRow(&rank, &threadCount, &n))
 		{
+			printf("Process %d: isAdditionRow = 1\n", rank);
 			subMatrixSize += 1;
 		}
+		printf("Process %d: subMatrixSize = %d\n", rank, subMatrixSize);
 
 		double** subMatrix = (double**)malloc(sizeof(double*) * subMatrixSize);
 		for (int i = 0; i < subMatrixSize; i++)
@@ -100,9 +111,8 @@ int main(int argc, char* argv[])
 		}
 
 		// Получение строк матрицы
-		recvRows(subMatrix, &subMatrixSize, &n, &isAdditionRow, &status);
-
-
+		recvRows(subMatrix, &subMatrixSize, &n, &status);
+		printf("Process %d: rows recv\n", rank);
 		while (crit == 0)
 		{
 			// Подсчет (Ax - b)
@@ -110,16 +120,20 @@ int main(int argc, char* argv[])
 			MPI_Recv(&crit, 1, MPI_INT, ROOT_THREAD, CRITERION_TAG, MPI_COMM_WORLD, &status);
 			//printf("Process %d: recieved calcCriterion = %d\n", rank, crit);
 		}
+		for (int i = 0; i < subMatrixSize; i++)
+		{
+			free(subMatrix[i]);
+		}
+		free(subMatrix);
+
 		printf("Process %d: Calculation done\n", rank);
 
-		free(vectorX);
-		free(vectorB);
+
 		//printf("Process %d: vectorB was free\n", rank);
 	}
 
-	//if (MPI_Probe(ROOT_THREAD, MPI_ANY_TAG, MPI_COMM_WORLD, &status) == MPI_SUCCESS)
-		//printf("Process %d: waiting for recv\n", rank);
-
+	free(vectorX);
+	free(vectorB);
 
 
 	// Завершение работы MPI
